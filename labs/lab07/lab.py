@@ -30,7 +30,7 @@ def match_1(string):
     >>> match_1("1b[#d] _")
     True
     """
-    pattern = ...
+    pattern = '^.{2}\[.{2}]'
 
     # Do not edit following code
     prog = re.compile(pattern)
@@ -57,7 +57,7 @@ def match_2(string):
     >>> match_2("(858) 456-7890b")
     False
     """
-    pattern = ...
+    pattern = '^\(858\) \d{3}-\d{4}$'
 
     # Do not edit following code
     prog = re.compile(pattern)
@@ -79,12 +79,12 @@ def match_3(string):
     False
     >>> match_3(" adfqwes ?")
     True
-    >>> match_3(" adf!qes ?")
+    >>> match_3(" adf!qes 5t?")
     False
     >>> match_3(" adf!qe? ")
     False
     """
-    pattern = ...
+    pattern = '^[\w\s?]{5,9}\?$'
 
     # Do not edit following code
     prog = re.compile(pattern)
@@ -113,7 +113,7 @@ def match_4(string):
     >>> match_4("$!@$")
     False
     """
-    pattern = ...
+    pattern = '^\$([^abc\$]*\$)?[aA]+[bB]+[cC]+$'
 
     # Do not edit following code
     prog = re.compile(pattern)
@@ -132,7 +132,7 @@ def match_5(string):
     >>> match_5("dsc80+.py")
     False
     """
-    pattern = ...
+    pattern = '[a-zA-Z0-9_]+\.py$'
 
     # Do not edit following code
     prog = re.compile(pattern)
@@ -153,7 +153,7 @@ def match_6(string):
     >>> match_6("ABCDEF_ABCD")
     False
     """
-    pattern = ...
+    pattern = '^[a-z]+_[a-z]+$'
 
     # Do not edit following code
     prog = re.compile(pattern)
@@ -172,7 +172,7 @@ def match_7(string):
     >>> match_7("_ncde")
     False
     """
-    pattern = ...
+    pattern = '^_.*\_$'
 
     # Do not edit following code
     prog = re.compile(pattern)
@@ -194,7 +194,7 @@ def match_8(string):
     >>> match_8("ASDJKL9380JKAL")
     True
     """
-    pattern = ...
+    pattern = '^[^Oi1]+$'
 
     # Do not edit following code
     prog = re.compile(pattern)
@@ -218,7 +218,7 @@ def match_9(string):
     >>> match_9('TX-32-SAN-4491')
     False
     '''
-    pattern = ...
+    pattern = '^((CA)-\d{2}-(LAX|SAN)-\d{4}|(NY)-\d{2}-([A-Z]{3})-\d{4})'
 
     # Do not edit following code
     prog = re.compile(pattern)
@@ -240,7 +240,11 @@ def match_10(string):
     ['bde']
     
     '''
-    ...
+    string = string.lower().replace('a','')
+    string = re.sub(r'[^\w+]+','',string)
+    pattern = '.{3}'
+    prog = re.compile(pattern)
+    return prog.findall(string)
 
 
 # ---------------------------------------------------------------------
@@ -249,20 +253,54 @@ def match_10(string):
 
 
 def extract_personal(s):
-    ...
+    email_pattern = '[\w]+@[\w]+[\w.]+'
+    prog_email = re.compile(email_pattern)
+    email = prog_email.findall(s)
+
+    ssn_pattern = '\d{3}-\d{2}-\d{4}'
+    prog_ssn = re.compile(ssn_pattern)
+    ssn  = prog_ssn.findall(s)
+
+    bitcoin_pattern = '[a-zA-Z0-9]{34}'
+    prog_bitcoin = re.compile(bitcoin_pattern)
+    bitcoin  = prog_bitcoin.findall(s)
+
+    street_pattern = '\d+ [a-zA-Z ]+'
+    prog_street = re.compile(street_pattern)
+    street  = prog_street.findall(s)
 
 
+    return email,ssn,bitcoin,street
 # ---------------------------------------------------------------------
 # QUESTION 3
 # ---------------------------------------------------------------------
 
 
 def tfidf_data(reviews_ser, review):
-    ...
 
 
+    tfidf_dict = {'word':[],'cnt':[],'tf':[],'idf':[],'tfidf':[]}
+    
+    for word in np.unique(review.split()):
+        pattern = fr'\b{word}\b'
+        prog = re.compile(pattern)
+        cnt = len(prog.findall(review))
+
+        tf = cnt/ len(review.split())
+        idf = np.log(len(reviews_ser) / reviews_ser.str.contains(pattern).sum() )
+        tfidf = tf*idf
+
+        tfidf_dict['word'].append(word)
+        tfidf_dict['cnt'].append(cnt)
+        tfidf_dict['tf'].append(tf)
+        tfidf_dict['idf'].append(idf)
+        tfidf_dict['tfidf'].append(tfidf)
+
+    df = pd.DataFrame(tfidf_dict).set_index('word')
+
+    return df
 def relevant_word(out):
-    ...
+    return out['tfidf'].idxmax()
 
 
 # ---------------------------------------------------------------------
@@ -271,22 +309,51 @@ def relevant_word(out):
 
 
 def hashtag_list(tweet_text):
-    ...
+    hashtag_pattern = r'#(\S+)'
+    hashtags = tweet_text.str.findall(hashtag_pattern)
+    return hashtags
 
 
 def most_common_hashtag(tweet_lists):
-    ...
+    hashtag_counts = {}
 
+    # Count the occurrences of each hashtag in the entire Series
+    for hashtags_list in tweet_lists:
+        for hashtag in hashtags_list:
+            hashtag_counts[hashtag] = hashtag_counts.get(hashtag, 0) + 1
 
+    # Define a function to get the most common hashtag in a list
+    def get_most_common_in_list(hashtags_list):
+        if not hashtags_list:
+            return np.NAN
+        return max(hashtags_list, key=lambda x: hashtag_counts[x])
+
+    # Apply the function to each list of hashtags in the Series
+    result = tweet_lists.apply(get_most_common_in_list)
+
+    return result
 # ---------------------------------------------------------------------
 # QUESTION 5
 # ---------------------------------------------------------------------
 
-
-
-
-    
-
-
 def create_features(ira):
-    ...
+    df = pd.DataFrame()
+    df['num_hashtags'] = hashtag_list(ira.loc[:,'text']).apply(len)
+    df['mc_hashtags'] = most_common_hashtag(hashtag_list(ira.loc[:,'text']))
+
+    tag_pattern = r'@'
+    df['num_tags'] = ira['text'].str.findall(tag_pattern).apply(len)
+
+    link_pattern = r'(http|https)(\S+)'
+    df['num_links'] = ira['text'].str.findall(link_pattern).apply(lambda x: len(x) if len(x)!=0 else 0)
+
+    retweet_pattern = r'^RT'
+    df['is_retweet'] = ira['text'].str.findall(retweet_pattern).apply(lambda x: True if len(x)!=0 else False)
+
+    df['text'] = ira['text'].str.replace(retweet_pattern,'',regex=True)\
+        .str.replace(r'@\S+','',regex=True).str.replace(link_pattern,'',regex=True)\
+        .str.replace( r'#(\S+)','',regex=True).str.replace(r'[^a-zA-Z0-9\s]', ' ', regex=True)\
+        .str.lower().str.replace(r'\s+', ' ',regex=True).str.strip()
+
+    df = df[['text', 'num_hashtags', 'mc_hashtags', 'num_tags', 'num_links', 'is_retweet']]
+    return df
